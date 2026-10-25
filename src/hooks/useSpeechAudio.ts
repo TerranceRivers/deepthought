@@ -1,16 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  ensureVoicesLoaded,
+  findBestNaturalVoice,
+  formatSpeechTextForNaturalCadence,
+  startSpeechKeepAlive,
+  stopSpeechKeepAlive,
+} from '../utils/naturalSpeech';
 
 export function useSpeechAudio() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentIdeaId, setCurrentIdeaId] = useState<string | null>(null);
   const [rate, setRate] = useState<number>(1.0);
+  const [activeVoiceName, setActiveVoiceName] = useState<string>('Natural Voice');
   const synthRef = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       synthRef.current = window.speechSynthesis;
     }
+    ensureVoicesLoaded();
     return () => {
+      stopSpeechKeepAlive();
       if (synthRef.current) {
         synthRef.current.cancel();
       }
@@ -18,6 +28,7 @@ export function useSpeechAudio() {
   }, []);
 
   const stop = useCallback(() => {
+    stopSpeechKeepAlive();
     if (synthRef.current) {
       synthRef.current.cancel();
     }
@@ -26,7 +37,7 @@ export function useSpeechAudio() {
   }, []);
 
   const speak = useCallback(
-    (ideaId: string, title: string, body: string, takeaway?: string, author?: string) => {
+    async (ideaId: string, title: string, body: string, takeaway?: string, author?: string, sourceTitle?: string) => {
       if (!synthRef.current) return;
 
       // If already playing this idea, pause/stop
@@ -36,35 +47,34 @@ export function useSpeechAudio() {
       }
 
       synthRef.current.cancel();
+      stopSpeechKeepAlive();
 
-      const textToRead = `${title}. By ${author || 'curator'}. ${body}. ${
-        takeaway ? `Actionable takeaway: ${takeaway}` : ''
-      }`;
-
+      const textToRead = formatSpeechTextForNaturalCadence(title, body, takeaway, author, sourceTitle);
       const utterance = new SpeechSynthesisUtterance(textToRead);
-      utterance.rate = rate;
-      utterance.pitch = 1.0;
+      utterance.rate = Math.max(0.75, Math.min(1.5, rate * 0.94));
+      utterance.pitch = 0.98;
 
-      // Try selecting a natural sounding English voice
-      const voices = synthRef.current.getVoices();
-      const preferredVoice = voices.find(
-        (v) => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.lang.startsWith('en')) && !v.name.includes('Bad')
-      );
+      const preferredVoice = await findBestNaturalVoice();
       if (preferredVoice) {
         utterance.voice = preferredVoice;
+        setActiveVoiceName(preferredVoice.name.replace(/Microsoft\s+|Google\s+|Apple\s+/gi, '').trim());
       }
 
       utterance.onstart = () => {
         setIsPlaying(true);
         setCurrentIdeaId(ideaId);
+        startSpeechKeepAlive();
       };
 
       utterance.onend = () => {
+        stopSpeechKeepAlive();
         setIsPlaying(false);
         setCurrentIdeaId(null);
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (e) => {
+        console.warn('Speech synthesis error:', e);
+        stopSpeechKeepAlive();
         setIsPlaying(false);
         setCurrentIdeaId(null);
       };
@@ -77,7 +87,6 @@ export function useSpeechAudio() {
   const changeRate = (newRate: number) => {
     setRate(newRate);
     if (isPlaying && currentIdeaId) {
-      // Re-trigger with new rate if currently playing
       stop();
     }
   };
@@ -85,6 +94,7 @@ export function useSpeechAudio() {
   return {
     isPlaying,
     currentIdeaId,
+    activeVoiceName,
     rate,
     speak,
     stop,

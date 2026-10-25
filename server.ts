@@ -36,9 +36,21 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const port = process.env.PORT || 3000;
 
-// Initialize Gemini SDK with server-side key
+// Initialize Gemini SDK with server-side key adhering to SDK guidelines
 const apiKey = process.env.GEMINI_API_KEY;
-const ai = apiKey ? new GoogleGenAI() : null;
+const ai = apiKey
+  ? new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    })
+  : null;
+
+// Server-side in-memory audio cache to guarantee fast response and save quota
+const ttsAudioCache = new Map<string, string>();
 
 // Helper to generate content with fallback cascade across responsive models
 async function generateContentWithFallback(aiInstance: GoogleGenAI, requestPayload: any) {
@@ -69,7 +81,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Natural Studio Voice Text-to-Speech using Gemini TTS (gemini-3.8-flash-lite-tts)
+// Natural Studio Voice Text-to-Speech using Gemini TTS
+// Cascades gemini-3.8-flash-tts (flagship natural speech) -> gemini-3.8-flash-lite-tts
 app.post('/api/tts', async (req, res) => {
   try {
     const { text, voiceName, style } = req.body;
@@ -81,49 +94,89 @@ app.post('/api/tts', async (req, res) => {
       return res.status(503).json({ error: 'Gemini API key not configured' });
     }
 
-    // Call gemini-3.8-flash-lite-tts for ultra-natural human speaking audio
+    const validVoices = ['Kore', 'Puck', 'Fenrir', 'Charon', 'Zephyr'];
+    const chosenVoice = validVoices.includes(voiceName) ? voiceName : 'Kore';
     const promptText = text.slice(0, 2500).trim();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-lite-tts',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: promptText,
-              speechMetadata: {
-                style: style || 'Warm, natural, engaging human narrator with clear articulation and conversational cadence',
-              },
-            },
-          ],
-        },
-      ],
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voiceName || 'Kore' }, // 'Kore' (warm female), 'Puck' (friendly male), 'Fenrir' (deep male), 'Zephyr'
-          },
-        },
-      },
-    });
+    const cacheKey = `${chosenVoice}:${promptText}`;
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
+    // Return cached audio if available
+    const cached = ttsAudioCache.get(cacheKey);
+    if (cached) {
       return res.json({
         success: true,
-        audioBase64: base64Audio,
+        audioBase64: cached,
         mimeType: 'audio/wav',
-        voiceName: voiceName || 'Kore'
+        voiceName: chosenVoice,
+        cached: true,
       });
     }
 
-    return res.status(500).json({ error: 'No audio stream returned' });
+    // Cascade: gemini-3.8-flash-tts first (flagship high-naturalness), then gemini-3.8-flash-lite-tts
+    const ttsModels = ['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'];
+    let generatedAudioBase64: string | null = null;
+    let lastError: any = null;
+
+    for (const model of ttsModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: promptText,
+                  speechMetadata: {
+                    style:
+                      style ||
+                      'Warm, articulate human narrator speaking with natural conversational prosody, calm breathing intervals, and clear inflection.',
+                  },
+                },
+              ],
+            },
+          ],
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: chosenVoice },
+              },
+            },
+          },
+        });
+
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (base64Audio) {
+          generatedAudioBase64 = base64Audio;
+          // Store in cache (cap at 100 entries to prevent memory growth)
+          if (ttsAudioCache.size > 100) {
+            const firstKey = ttsAudioCache.keys().next().value;
+            if (firstKey) ttsAudioCache.delete(firstKey);
+          }
+          ttsAudioCache.set(cacheKey, base64Audio);
+          break;
+        }
+      } catch (err: any) {
+        console.warn(`TTS model ${model} notice (${err.message}). Trying fallback...`);
+        lastError = err;
+      }
+    }
+
+    if (generatedAudioBase64) {
+      return res.json({
+        success: true,
+        audioBase64: generatedAudioBase64,
+        mimeType: 'audio/wav',
+        voiceName: chosenVoice,
+      });
+    }
+
+    throw lastError || new Error('No audio returned from speech synthesis');
   } catch (error: any) {
     console.warn('Gemini TTS error or rate limit:', error.message);
     return res.status(503).json({
       error: error.message || 'TTS generation unavailable',
-      fallbackRecommended: true
+      fallbackRecommended: true,
     });
   }
 });

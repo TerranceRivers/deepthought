@@ -470,6 +470,9 @@ export const EbookUploadModal: React.FC<EbookUploadModalProps> = ({
                       <option value="studio-kore">🎙️ Studio Kore (Warm, Natural Female)</option>
                       <option value="studio-puck">🎙️ Studio Puck (Conversational, Lively Male)</option>
                       <option value="studio-fenrir">🎙️ Studio Fenrir (Deep, Resonant Male)</option>
+                      <option value="studio-charon">🎙️ Studio Charon (Authoritative Male)</option>
+                      <option value="studio-zephyr">🎙️ Studio Zephyr (Bright Modern Female)</option>
+                      <option value="browser-natural">✨ Best Natural Browser Voice (Auto)</option>
                     </select>
                   </div>
                 </div>

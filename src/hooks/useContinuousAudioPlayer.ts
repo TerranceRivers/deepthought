@@ -1,7 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { IdeaCard } from '../types';
+import {
+  ensureVoicesLoaded,
+  getCuratedNaturalVoices,
+  findBestNaturalVoice,
+  formatSpeechTextForNaturalCadence,
+  startSpeechKeepAlive,
+  stopSpeechKeepAlive,
+  AvailableVoice,
+} from '../utils/naturalSpeech';
 
-export type VoiceMode = 'studio-kore' | 'studio-puck' | 'studio-fenrir';
+export type VoiceMode =
+  | 'studio-kore'
+  | 'studio-puck'
+  | 'studio-fenrir'
+  | 'studio-charon'
+  | 'studio-zephyr'
+  | 'browser-natural';
 
 interface UseContinuousAudioPlayerOptions {
   onCardRead?: (card: IdeaCard) => void;
@@ -13,6 +28,8 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
   const [isPaused, setIsPaused] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [currentIdea, setCurrentIdea] = useState<IdeaCard | null>(null);
+  const [activeVoiceLabel, setActiveVoiceLabel] = useState<string>('Studio Voice (AI)');
+  const [isStudioAudioActive, setIsStudioAudioActive] = useState<boolean>(false);
   
   // Continuous 10-Post Batch State
   const [isAutoPlayActive, setIsAutoPlayActive] = useState(false);
@@ -21,8 +38,10 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
   const [batchLimit, setBatchLimit] = useState(10);
   const [isBatchFinished, setIsBatchFinished] = useState(false);
 
-  // Settings
+  // Settings & Voices
   const [voiceMode, setVoiceMode] = useState<VoiceMode>('studio-kore');
+  const [selectedBrowserVoiceId, setSelectedBrowserVoiceId] = useState<string | null>(null);
+  const [availableVoices, setAvailableVoices] = useState<AvailableVoice[]>([]);
   const [rate, setRate] = useState<number>(1.0);
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
 
@@ -30,13 +49,29 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const audioCacheRef = useRef<Map<string, string>>(new Map());
-  const prefetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Load natural browser voices on mount
   useEffect(() => {
+    let isMounted = true;
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       synthRef.current = window.speechSynthesis;
     }
+
+    ensureVoicesLoaded().then(() => {
+      if (!isMounted) return;
+      getCuratedNaturalVoices().then((curated) => {
+        if (isMounted) {
+          setAvailableVoices(curated);
+          if (curated.length > 0 && !selectedBrowserVoiceId) {
+            setSelectedBrowserVoiceId(curated[0].id);
+          }
+        }
+      });
+    });
+
     return () => {
+      isMounted = false;
+      stopSpeechKeepAlive();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -49,59 +84,61 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
 
   // Format clean, human-like speech text with conversational cadence
   const prepareSpeechText = useCallback((idea: IdeaCard) => {
-    const authorLine = idea.author ? `by ${idea.author}, from ${idea.sourceTitle}.` : `from ${idea.sourceTitle}.`;
-    const takeawayLine = idea.actionableTakeaway ? `Actionable takeaway: ${idea.actionableTakeaway}` : '';
-    return `${idea.title}. ${authorLine} ${idea.body}. ${takeawayLine}`;
+    return formatSpeechTextForNaturalCadence(
+      idea.title,
+      idea.body,
+      idea.actionableTakeaway,
+      idea.author,
+      idea.sourceTitle
+    );
   }, []);
 
-  // Fallback to Web Speech API with highest-quality natural human voice
+  // Web Speech playback with guaranteed high-quality natural human voice
   const playWebSpeechFallback = useCallback(
-    (idea: IdeaCard, onEndedCallback: () => void) => {
+    async (idea: IdeaCard, onEndedCallback: () => void) => {
       if (!synthRef.current) return;
       synthRef.current.cancel();
+      stopSpeechKeepAlive();
 
       const text = prepareSpeechText(idea);
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = rate * 0.96; // slightly relaxed for natural breathing pace
-      utterance.pitch = 1.0;
+      // Relaxed, human conversation pace
+      utterance.rate = Math.max(0.75, Math.min(1.5, rate * 0.94));
+      // Warmer, non-robotic pitch
+      utterance.pitch = 0.98;
 
-      const voices = synthRef.current.getVoices();
-      // Look for known high-quality natural voices first (Google US English, Samantha, Alex, Karen, Natural)
-      const naturalVoice = voices.find(
-        (v) =>
-          (v.name.includes('Natural') ||
-            v.name.includes('Google') ||
-            v.name.includes('Samantha') ||
-            v.name.includes('Karen') ||
-            v.name.includes('Alex') ||
-            v.name.includes('Daniel') ||
-            v.name.includes('Enhanced')) &&
-          v.lang.startsWith('en')
-      ) || voices.find((v) => v.lang.startsWith('en'));
-
-      if (naturalVoice) {
-        utterance.voice = naturalVoice;
+      const chosenVoice = await findBestNaturalVoice(selectedBrowserVoiceId || undefined);
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
+        setActiveVoiceLabel(chosenVoice.name.replace(/Microsoft\s+|Google\s+|Apple\s+/gi, '').trim());
+      } else {
+        setActiveVoiceLabel('Natural Voice');
       }
+
+      setIsStudioAudioActive(false);
 
       utterance.onstart = () => {
         setIsLoadingAudio(false);
         setIsPlaying(true);
         setIsPaused(false);
+        startSpeechKeepAlive();
       };
 
       utterance.onend = () => {
+        stopSpeechKeepAlive();
         onEndedCallback();
       };
 
       utterance.onerror = (e) => {
-        console.warn('SpeechSynthesis error:', e);
+        console.warn('Natural SpeechSynthesis notice:', e);
+        stopSpeechKeepAlive();
         setIsPlaying(false);
         setIsLoadingAudio(false);
       };
 
       synthRef.current.speak(utterance);
     },
-    [prepareSpeechText, rate]
+    [prepareSpeechText, rate, selectedBrowserVoiceId]
   );
 
   // Stop any active audio
@@ -173,18 +210,22 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
         }
       }
 
-      // Check cache for this idea's studio voice
-      const voiceNameMap: Record<VoiceMode, string> = {
+      // Check if user selected a studio AI voice or browser natural voice
+      const studioVoiceMap: Record<string, string> = {
         'studio-kore': 'Kore',
         'studio-puck': 'Puck',
         'studio-fenrir': 'Fenrir',
+        'studio-charon': 'Charon',
+        'studio-zephyr': 'Zephyr',
       };
-      const selectedVoiceName = voiceNameMap[voiceMode];
+
+      const isStudioMode = voiceMode.startsWith('studio-');
+      const selectedVoiceName = studioVoiceMap[voiceMode] || 'Kore';
       const cacheKey = `${idea.id}_${selectedVoiceName}`;
 
-      let base64Audio = audioCacheRef.current.get(cacheKey);
+      let base64Audio = isStudioMode ? audioCacheRef.current.get(cacheKey) : undefined;
 
-      if (!base64Audio) {
+      if (isStudioMode && !base64Audio) {
         try {
           const res = await fetch('/api/tts', {
             method: 'POST',
@@ -192,7 +233,7 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
             body: JSON.stringify({
               text: prepareSpeechText(idea),
               voiceName: selectedVoiceName,
-              style: 'Warm, natural, engaging conversational narrator with articulate pacing',
+              style: 'Warm, natural, articulate human narrator with natural pacing and conversational prosody',
             }),
           });
 
@@ -204,7 +245,7 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
             }
           }
         } catch (err) {
-          console.warn('Studio TTS fetch failed, switching to natural client voice:', err);
+          console.warn('Studio TTS fetch notice, using natural browser speech engine:', err);
         }
       }
 
@@ -214,6 +255,8 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
           const audio = new Audio(`data:audio/wav;base64,${base64Audio}`);
           audio.playbackRate = rate;
           audioRef.current = audio;
+          setIsStudioAudioActive(true);
+          setActiveVoiceLabel(`Studio ${selectedVoiceName} (AI Natural)`);
 
           audio.oncanplaythrough = () => {
             setIsLoadingAudio(false);
@@ -225,7 +268,7 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
           };
 
           audio.onerror = () => {
-            console.warn('Audio playback error, falling back to speech synthesis');
+            console.warn('Audio playback error, falling back to natural speech synthesis');
             playWebSpeechFallback(idea, onCardFinished);
           };
 
@@ -236,8 +279,8 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
         }
       }
 
-      // Fallback if studio TTS failed or was unavailable
-      playWebSpeechFallback(idea, onCardFinished);
+      // High-quality fallback with natural/neural browser voice
+      await playWebSpeechFallback(idea, onCardFinished);
     },
     [autoScroll, voiceMode, rate, prepareSpeechText, playWebSpeechFallback, options]
   );
@@ -374,6 +417,11 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
     isBatchFinished,
     voiceMode,
     setVoiceMode,
+    activeVoiceLabel,
+    isStudioAudioActive,
+    availableVoices,
+    selectedBrowserVoiceId,
+    setSelectedBrowserVoiceId,
     rate,
     changeRate,
     autoScroll,
