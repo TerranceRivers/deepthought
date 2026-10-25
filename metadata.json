@@ -1,0 +1,6 @@
+{
+  "name": "Deepstash - Micro-Learning & Curated Ideas",
+  "description": "A micro-learning platform for bite-sized insights, smart stashes, daily wisdom, and AI-powered idea extraction from books, articles, and podcasts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
