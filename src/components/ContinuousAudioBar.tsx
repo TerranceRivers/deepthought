@@ -259,7 +259,6 @@ export const ContinuousAudioBar: React.FC<ContinuousAudioBarProps> = ({
                 <option value="studio-kore">🎙️ Studio Kore (Warm & Natural Female)</option>
                 <option value="studio-puck">🎙️ Studio Puck (Conversational Male)</option>
                 <option value="studio-fenrir">🎙️ Studio Fenrir (Deep Resonant Male)</option>
-                <option value="natural-device">📱 Enhanced Device Voice</option>
               </select>
             </div>
 

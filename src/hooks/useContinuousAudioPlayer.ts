@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { IdeaCard } from '../types';
 
-export type VoiceMode = 'studio-kore' | 'studio-puck' | 'studio-fenrir' | 'natural-device';
+export type VoiceMode = 'studio-kore' | 'studio-puck' | 'studio-fenrir';
 
 interface UseContinuousAudioPlayerOptions {
   onCardRead?: (card: IdeaCard) => void;
@@ -173,18 +173,11 @@ export function useContinuousAudioPlayer(options?: UseContinuousAudioPlayerOptio
         }
       }
 
-      // If user selected device voice, skip Studio API
-      if (voiceMode === 'natural-device') {
-        playWebSpeechFallback(idea, onCardFinished);
-        return;
-      }
-
       // Check cache for this idea's studio voice
       const voiceNameMap: Record<VoiceMode, string> = {
         'studio-kore': 'Kore',
         'studio-puck': 'Puck',
         'studio-fenrir': 'Fenrir',
-        'natural-device': 'Kore',
       };
       const selectedVoiceName = voiceNameMap[voiceMode];
       const cacheKey = `${idea.id}_${selectedVoiceName}`;

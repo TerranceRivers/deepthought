@@ -27,6 +27,8 @@ import { CreateCardModal } from './components/CreateCardModal';
 import { CardDetailModal } from './components/CardDetailModal';
 import { DailyStreakBanner } from './components/DailyStreakBanner';
 import { EbookUploadModal } from './components/EbookUploadModal';
+import { InstallAppButton } from './components/InstallAppButton';
+import { normalizeIdeaCard, normalizeIdeaCards } from './utils/ideaContent';
 
 const TOPIC_FILTERS = [
   'All',
@@ -68,13 +70,13 @@ export default function App() {
       const saved = localStorage.getItem('deepstash_ideas');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          return normalizeIdeaCards(JSON.parse(saved));
         } catch (e) {
           console.error(e);
         }
       }
     }
-    return INITIAL_IDEAS;
+    return normalizeIdeaCards(INITIAL_IDEAS);
   });
 
   // Stashes state
@@ -257,7 +259,7 @@ export default function App() {
   // Add ideas extracted from AI
   const handleAddExtractedIdeas = useCallback(
     (newIdeas: IdeaCard[], targetStashId?: string) => {
-      setIdeas((prev) => [...newIdeas, ...prev]);
+      setIdeas((prev) => [...normalizeIdeaCards(newIdeas), ...prev]);
 
       if (targetStashId) {
         const idsToAdd = newIdeas.map((i) => i.id);
@@ -277,7 +279,7 @@ export default function App() {
 
   // Add manually created idea
   const handleCreateCard = useCallback((newIdea: IdeaCard, targetStashId?: string) => {
-    setIdeas((prev) => [newIdea, ...prev]);
+    setIdeas((prev) => [normalizeIdeaCard(newIdea), ...prev]);
     if (targetStashId) {
       setStashes((prev) =>
         prev.map((s) =>
@@ -293,7 +295,7 @@ export default function App() {
   // Add Ebook cards into dedicated new Stash
   const handleCreateStashWithIdeas = useCallback(
     (stashName: string, description: string, iconEmoji: string, newCards: IdeaCard[]) => {
-      setIdeas((prev) => [...newCards, ...prev]);
+      setIdeas((prev) => [...normalizeIdeaCards(newCards), ...prev]);
 
       const newStash: Stash = {
         id: `stash_ebook_${Date.now()}`,
@@ -742,6 +744,7 @@ export default function App() {
         onPrev={audioPlayer.prevInBatch}
         onContinueNext10={() => audioPlayer.continueNextBatch(filteredIdeas)}
       />
+      <InstallAppButton />
     </div>
   );
 }

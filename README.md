@@ -8,6 +8,7 @@ A modern micro-learning platform for bite-sized insights, 1,000-character concep
 
 - **1,000-Character Micro-Learning Digests:** High-impact, bite-sized deep dives and takeaways calibrated for fast comprehension and lasting retention.
 - **Natural Voice Audio Narration:** Listen to any idea or chapter with human-like voices (pitch, rate, tone controls, speech synthesis).
+- **Installable Mobile App:** Add Deepthought to an Android or iPhone home screen for a standalone experience with offline app-shell support.
 - **Interactive Flashcard Mindmaps:** Connect related concepts, review flashcard summaries, test your recall, and navigate knowledge graphs.
 - **EPUB & PDF Book Extractor:** Drop in your favorite ebooks or documents to extract core themes, takeaways, and chapter summaries automatically.
 - **Dual AI & Offline Resilient Synthesis:** Powered by Google Gemini API with built-in heuristic synthesis fallbacks—the app operates smoothly even without an API key!
@@ -47,6 +48,10 @@ npm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Install on a phone
+
+Deploy the production build over HTTPS, then open it on the phone. On Android, tap the in-app **Install app** button (or the browser's install menu item). On iPhone or iPad, open it in Safari, tap **Share**, then **Add to Home Screen**.
 
 ---
 

@@ -1,4 +1,5 @@
 import { IdeaCard } from '../types';
+import { normalizeIdeaCard } from './ideaContent';
 
 export function synthesizeDetailedFallbackCards(
   title: string,
@@ -63,7 +64,7 @@ export function synthesizeDetailedFallbackCards(
       synthesizedBody = `${excerpt}\n\n${card.body.slice(0, 500)}`;
     }
 
-    return {
+    return normalizeIdeaCard({
       id: `ebook_synth_${Date.now()}_${idx}`,
       title: card.title,
       body: synthesizedBody,
@@ -75,6 +76,6 @@ export function synthesizeDetailedFallbackCards(
       readTime: `${Math.max(1, Math.round(synthesizedBody.length / 500))} min read`,
       likesCount: 22 + idx * 4,
       createdAt: new Date().toISOString(),
-    };
+    });
   });
 }

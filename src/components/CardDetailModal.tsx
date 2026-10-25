@@ -112,7 +112,6 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
                 <option value="studio-kore">🎙️ Studio Kore (Female)</option>
                 <option value="studio-puck">🎙️ Studio Puck (Male)</option>
                 <option value="studio-fenrir">🎙️ Studio Fenrir (Deep)</option>
-                <option value="natural-device">📱 Device Voice</option>
               </select>
             )}
           </div>

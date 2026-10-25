@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "Deepthought — Daily Learning",
+  "short_name": "Deepthought",
+  "description": "Read and listen to 1,000-character insights from books and ideas.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fafaf9",
+  "theme_color": "#2563eb",
+  "categories": ["education", "books", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/deepthought.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

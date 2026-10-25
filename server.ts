@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { synthesizeDetailedFallbackCards } from './src/utils/synthesisFallback.ts';
+import { normalizeIdeaCards } from './src/utils/ideaContent.ts';
 
 dotenv.config();
 
@@ -161,7 +162,7 @@ Analyze this uploaded ebook PDF: "${title}" by ${authorName}.
 Extract exactly ${count} distinct, high-impact "Idea Cards" representing the most profound, practical lessons and mental models from this book.
 
 CRITICAL LENGTH REQUIREMENT:
-Each card's 'body' MUST be approximately 1,000 characters in length (target 850 to 1,150 characters, roughly 140 to 190 words).
+Each card's 'body' MUST be exactly 1,000 characters in length, including spaces.
 Do NOT write short 30-word summaries. Provide an in-depth, comprehensive explanation detailing the underlying principle, how the mechanism operates in practice, real-world examples, and nuanced implications so the reader gets deep mastery.
 Format each card with:
 - title: Punchy headline title (4-8 words)
@@ -182,7 +183,7 @@ ${rawText}
 """
 
 CRITICAL LENGTH REQUIREMENT:
-Each card's 'body' MUST be approximately 1,000 characters in length (target 850 to 1,150 characters, roughly 140 to 190 words).
+Each card's 'body' MUST be exactly 1,000 characters in length, including spaces.
 Do NOT write brief summaries. Provide an in-depth, comprehensive breakdown explaining the core principle, the psychological or strategic mechanism, concrete context, and nuanced takeaways.
 Format each card with:
 - title: Punchy headline (4-8 words)
@@ -226,7 +227,7 @@ Format each card with:
     });
 
     const parsed = JSON.parse(response.text || '[]');
-    const ideas = parsed.map((item: any, idx: number) => ({
+    const ideas = normalizeIdeaCards(parsed.map((item: any, idx: number) => ({
       ...item,
       id: `ebook_${Date.now()}_${idx}`,
       sourceType: 'Book',
@@ -235,7 +236,7 @@ Format each card with:
       likesCount: Math.floor(Math.random() * 20) + 18,
       readTime: item.readTime || `${Math.max(1, Math.round((item.body?.length || 1000) / 500))} min read`,
       createdAt: new Date().toISOString()
-    }));
+    })));
 
     return res.json({ success: true, ideas, bookTitle: title, author: authorName });
   } catch (error: any) {
@@ -301,7 +302,7 @@ app.post('/api/extract-ideas', async (req, res) => {
         }
       ];
 
-      return res.json({ success: true, ideas: mockIdeas, source: 'fallback' });
+      return res.json({ success: true, ideas: normalizeIdeaCards(mockIdeas as any), source: 'fallback' });
     }
 
     const prompt = `You are an elite micro-learning curator for Deepstash.
@@ -309,7 +310,7 @@ Analyze the provided source text, notes, or topic excerpt.
 Extract 3 to 4 distinct, memorable, and actionable "Idea Cards".
 
 CRITICAL LENGTH REQUIREMENT:
-Each card's 'body' MUST be approximately 1,000 characters in length (target 850 to 1,150 characters, roughly 140 to 190 words).
+Each card's 'body' MUST be exactly 1,000 characters in length, including spaces.
 Do NOT write brief 30-word summaries. Provide an in-depth, comprehensive breakdown explaining the core principle, how it works in real life, underlying psychological or practical mechanisms, and nuanced takeaways.
 
 Source Text:
@@ -375,13 +376,13 @@ Output a JSON array of objects conforming to the schema.`;
     });
 
     const parsed = JSON.parse(response.text || '[]');
-    const ideas = parsed.map((item: any, idx: number) => ({
+    const ideas = normalizeIdeaCards(parsed.map((item: any, idx: number) => ({
       ...item,
       id: `ai_${Date.now()}_${idx}`,
       likesCount: Math.floor(Math.random() * 25) + 10,
       readTime: item.readTime || `${Math.max(1, Math.round((item.body?.length || 1000) / 500))} min read`,
       createdAt: new Date().toISOString()
-    }));
+    })));
 
     return res.json({ success: true, ideas, source: 'gemini' });
   } catch (error: any) {

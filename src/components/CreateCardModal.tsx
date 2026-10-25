@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Sparkles, BookOpen } from 'lucide-react';
 import { IdeaCard, SourceType, Stash } from '../types';
+import { IDEA_BODY_CHARACTER_LIMIT } from '../utils/ideaContent';
 
 interface CreateCardModalProps {
   onClose: () => void;
@@ -24,7 +25,7 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !body.trim()) return;
+    if (!title.trim() || body.trim().length !== IDEA_BODY_CHARACTER_LIMIT) return;
 
     const tags = tagsInput
       .split(',')
@@ -94,16 +95,20 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 mb-1">
-              Core Takeaway Prose * (30-60 words)
+              Core Takeaway Prose * (exactly {IDEA_BODY_CHARACTER_LIMIT.toLocaleString()} characters)
             </label>
             <textarea
               rows={4}
               required
               value={body}
               onChange={(e) => setBody(e.target.value)}
+              maxLength={IDEA_BODY_CHARACTER_LIMIT}
               placeholder="Explain the concept clearly and concisely with high signal-to-noise ratio..."
               className="w-full p-3.5 text-xs sm:text-sm rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <div className={`mt-1 text-right text-[11px] ${body.trim().length === IDEA_BODY_CHARACTER_LIMIT ? 'text-emerald-600' : 'text-stone-400'}`}>
+              {body.trim().length.toLocaleString()} / {IDEA_BODY_CHARACTER_LIMIT.toLocaleString()} characters
+            </div>
           </div>
 
           <div>
@@ -209,7 +214,8 @@ export const CreateCardModal: React.FC<CreateCardModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all"
+              disabled={!title.trim() || body.trim().length !== IDEA_BODY_CHARACTER_LIMIT}
+              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
               <span>Publish Card</span>
