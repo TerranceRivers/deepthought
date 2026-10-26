@@ -722,6 +722,12 @@ export default function App() {
       )}
 
       {/* Persistent Continuous Audio Player Bar */}
+      {audioPlayer.audioError && (
+        <div role="alert" className="fixed bottom-40 left-4 right-4 z-[70] mx-auto max-w-xl rounded-xl bg-rose-950 p-4 text-sm text-white shadow-xl">
+          {audioPlayer.audioError}
+          <button onClick={audioPlayer.stop} className="ml-4 underline">Dismiss</button>
+        </div>
+      )}
       <ContinuousAudioBar
         currentIdea={audioPlayer.currentIdea}
         isPlaying={audioPlayer.isPlaying}

@@ -60,7 +60,9 @@ Deploy the production build over HTTPS, then open it on the phone. On Android, t
 - **Frontend:** React 19, TypeScript, Tailwind CSS, Motion, Lucide React
 - **Backend / Dev Server:** Node.js, Express, tsx, Vite
 - **Document Processing:** JSZip (EPUB parser), Canvas/PDF text extraction
-- **Audio:** Web Speech API natural voice synthesis
+- **Audio:** Gemini studio narration. Requires a valid server-side Gemini API key with TTS model access and available quota. Device speech is never used as a fallback.
+
+Audio regression checks: `node --import tsx --test src/utils/studioPlayer.test.ts`.
 
 ---
 

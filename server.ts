@@ -38,7 +38,7 @@ const port = process.env.PORT || 3000;
 
 // Initialize Gemini SDK with server-side key
 const apiKey = process.env.GEMINI_API_KEY;
-const ai = apiKey ? new GoogleGenAI() : null;
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Helper to generate content with fallback cascade across responsive models
 async function generateContentWithFallback(aiInstance: GoogleGenAI, requestPayload: any) {
@@ -69,62 +69,57 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Natural Studio Voice Text-to-Speech using Gemini TTS (gemini-3.8-flash-lite-tts)
+// Studio narration uses the documented Interactions API and returns WAV.
 app.post('/api/tts', async (req, res) => {
+  const { text, voiceName = 'Kore' } = req.body;
+  if (typeof text !== 'string' || !text.trim() || text.length > 12000) {
+    return res.status(400).json({ error: 'Narration requires text between 1 and 12,000 characters.' });
+  }
+  if (!['Kore', 'Puck', 'Fenrir'].includes(voiceName)) {
+    return res.status(400).json({ error: 'Choose a supported studio voice.' });
+  }
+  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+    return res.status(503).json({ error: 'Studio narration needs a Gemini API key configured on the server.' });
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 80000);
+  const disconnect = () => { if (!res.writableEnded) controller.abort(); };
+  res.on('close', disconnect);
   try {
-    const { text, voiceName, style } = req.body;
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Text content is required for speech' });
-    }
-
-    if (!ai) {
-      return res.status(503).json({ error: 'Gemini API key not configured' });
-    }
-
-    // Call gemini-3.8-flash-lite-tts for ultra-natural human speaking audio
-    const promptText = text.slice(0, 2500).trim();
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-lite-tts',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: promptText,
-              speechMetadata: {
-                style: style || 'Warm, natural, engaging human narrator with clear articulation and conversational cadence',
-              },
-            },
-          ],
-        },
-      ],
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: voiceName || 'Kore' }, // 'Kore' (warm female), 'Puck' (friendly male), 'Fenrir' (deep male), 'Zephyr'
-          },
-        },
-      },
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+      method: 'POST', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        model: 'gemini-3.8-flash-tts',
+        input: [{ type: 'user_input', content: [{
+          type: 'text', text: text.trim(),
+          annotations: [{ type: 'speech_metadata', style: 'Warm, natural audiobook narrator. Conversational pacing, clear articulation, gentle pauses. One consistent speaker.' }],
+        }] }],
+        response_format: { type: 'audio' },
+        generation_config: { speech_config: [{ voice: voiceName }] },
+      }),
     });
-
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
-      return res.json({
-        success: true,
-        audioBase64: base64Audio,
-        mimeType: 'audio/wav',
-        voiceName: voiceName || 'Kore'
-      });
+    const result = await response.json();
+    if (!response.ok) {
+      console.warn('Studio narration provider status:', response.status);
+      return res.status(503).json({ error: response.status === 429
+        ? 'Studio narration is busy or its quota is exhausted. Please retry later.'
+        : 'Studio narration is unavailable. Check the server Gemini key, model access, and billing.' });
     }
-
-    return res.status(500).json({ error: 'No audio stream returned' });
+    const blocks = (result.steps || []).filter((step: any) => step.type === 'model_output')
+      .flatMap((step: any) => step.content || []);
+    const audio = blocks.filter((block: any) => block.type === 'audio' && block.data).at(-1);
+    const bytes = Buffer.from(audio?.data || '', 'base64');
+    if (bytes.toString('ascii', 0, 4) !== 'RIFF' || bytes.toString('ascii', 8, 12) !== 'WAVE') {
+      throw new Error('Provider did not return WAV audio');
+    }
+    return res.json({ success: true, audioBase64: audio.data, mimeType: 'audio/wav', voiceName });
   } catch (error: any) {
-    console.warn('Gemini TTS error or rate limit:', error.message);
-    return res.status(503).json({
-      error: error.message || 'TTS generation unavailable',
-      fallbackRecommended: true
-    });
+    console.warn('Studio narration failed:', error.name);
+    if (!res.destroyed) return res.status(503).json({ error: 'Studio narration could not finish. Please retry.' });
+  } finally {
+    clearTimeout(timeout);
+    res.off('close', disconnect);
   }
 });
 

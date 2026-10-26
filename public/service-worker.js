@@ -1,4 +1,4 @@
-const CACHE_NAME = 'deepthought-shell-v1';
+const CACHE_NAME = 'deepthought-shell-v2';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/deepthought.svg'];
 
 self.addEventListener('install', (event) => {
