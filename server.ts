@@ -75,7 +75,7 @@ app.post('/api/tts', async (req, res) => {
   if (typeof text !== 'string' || !text.trim() || text.length > 12000) {
     return res.status(400).json({ error: 'Narration requires text between 1 and 12,000 characters.' });
   }
-  if (!['Kore', 'Puck', 'Fenrir'].includes(voiceName)) {
+  if (!['Kore', 'Puck', 'Fenrir', 'Charon', 'Zephyr'].includes(voiceName)) {
     return res.status(400).json({ error: 'Choose a supported studio voice.' });
   }
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {

@@ -739,6 +739,8 @@ export default function App() {
         isBatchFinished={audioPlayer.isBatchFinished}
         voiceMode={audioPlayer.voiceMode}
         onSelectVoiceMode={audioPlayer.setVoiceMode}
+        activeVoiceLabel={audioPlayer.voiceMode.replace('studio-', 'Studio ')}
+        isStudioAudioActive={audioPlayer.isPlaying}
         rate={audioPlayer.rate}
         onChangeRate={audioPlayer.changeRate}
         autoScroll={audioPlayer.autoScroll}

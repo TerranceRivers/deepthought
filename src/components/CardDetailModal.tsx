@@ -107,11 +107,15 @@ export const CardDetailModal: React.FC<CardDetailModalProps> = ({
               <select
                 value={voiceMode}
                 onChange={(e) => onSelectVoiceMode(e.target.value as VoiceMode)}
-                className="px-2 py-1 text-xs rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-200 font-medium"
+                className="px-2.5 py-1 text-xs rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-200 font-medium"
               >
-                <option value="studio-kore">🎙️ Studio Kore (Female)</option>
-                <option value="studio-puck">🎙️ Studio Puck (Male)</option>
-                <option value="studio-fenrir">🎙️ Studio Fenrir (Deep)</option>
+                <optgroup label="Studio AI Voices">
+                  <option value="studio-kore">🎙️ Kore (Warm Female)</option>
+                  <option value="studio-puck">🎙️ Puck (Conversational Male)</option>
+                  <option value="studio-fenrir">🎙️ Fenrir (Deep Male)</option>
+                  <option value="studio-charon">🎙️ Charon (Broadcast Male)</option>
+                  <option value="studio-zephyr">🎙️ Zephyr (Modern Female)</option>
+                </optgroup>
               </select>
             )}
           </div>

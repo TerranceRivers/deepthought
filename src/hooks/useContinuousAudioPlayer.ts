@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { IdeaCard } from '../types';
 import { StudioPlayer } from '../utils/studioPlayer';
 
-export type VoiceMode = 'studio-kore' | 'studio-puck' | 'studio-fenrir';
-const VOICES = { 'studio-kore': 'Kore', 'studio-puck': 'Puck', 'studio-fenrir': 'Fenrir' };
+export type VoiceMode = 'studio-kore' | 'studio-puck' | 'studio-fenrir' | 'studio-charon' | 'studio-zephyr';
+const VOICES = { 'studio-kore': 'Kore', 'studio-puck': 'Puck', 'studio-fenrir': 'Fenrir', 'studio-charon': 'Charon', 'studio-zephyr': 'Zephyr' };
 interface Options { onCardRead?: (card: IdeaCard) => void; onBatchComplete?: (count: number) => void; }
 export function useContinuousAudioPlayer(options?: Options) {
   const [isPlaying, setIsPlaying] = useState(false);
